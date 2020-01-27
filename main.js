@@ -3,14 +3,18 @@ const fs = require("fs");
 const mysql = require("mysql");
 require("dotenv").config();
 
-console.log(process.env.MY_SECRET)
-
 let connection = mysql.createConnection({
   host: "localhost",
   user: "root",
   password: process.env.MYSQL_PASSWORD,
   database: "employee_dataDB"
 });
+
+const cleanUpAndEnd = () => {
+  console.log("Goodbye!");
+  connection.end()
+  process.exit(0)
+}
 
 const promptForAction = () => {
   inquirer.prompt({
@@ -29,93 +33,96 @@ const promptForAction = () => {
       case "Add Role": return addRole();
     }
   });
-}
-const cleanUpAndEnd = () => {
-  console.log("Goodbye!");
-  connection.end()
-  process.exit(0)
-}
-
-const getRoles = () => {
-  let options = [];
-  let query = "SELECT (title) FROM ROLES";
-  // let query = "INSERT INTO EMPLOYEES (first_name, last_name, role_id, manager_id) values(?)";
-  // console.log("QUERY ROLES", query);
-  connection.query(query, (err, result) => {// hmm
-    if (err) throw err;
-    result.forEach(element => {
-      options.push(element.title);
-      // console.log("ELEMENT", element.title);
-    })
-    console.log("record inserted", options);
-  })
-  console.log("options", options);
-  return options; // returns too soon
-}
-
-getRoles.catch = (err) => {
-  console.log("ERROR in getRoles:", err);
 };
 
 const addEmployee = () => {
+  let query = "SELECT (title) FROM ROLES";
+  let roles = [];
+  connection.query(query, (err, result) => {
+    if (err) throw err;
+    roles = result.map(element => element.title);
+    employeeQuestions(roles);
+    console.log("ROLES inside query:", roles);
+  });
+};
+
+addEmployee.catch = (err) => {
+  console.log("ERROR in addEmployee:", err);
+};
+
+const employeeQuestions = (roles) => {
+  console.log("roles?", roles);
   inquirer.prompt([
     {
       type: "input",
-      name: "firstName",
+      name: "first_name",
       message: "Enter the employee's first name",
       required: "true",
       default: "no-first-name"
     },
     {
       type: "input",
-      name: "lastName",
+      name: "last_name",
       message: "Enter the employee's last name",
       required: "true",
       default: "no-last-name"
     },
-    { // TODO: this needs to be a list of options from the roles database
-      type: "input",
-      name: "role", 
-      message: "Enter the employee's role",
-      choices: ["temp"], // TODO: create function getRolesList
+    {
+      type: "list",
+      name: "role_id", 
+      message: "Select the employee's role",
+      choices: roles,
       required: "true",
-      default: "unknown"
     },
     { // TODO: this needs to be a list of options from the managers in the employee database
       type: "input",
-      name: "manager",
+      name: "manager_id",
       message: "Enter the employee's manager", // TODO: create function to get managers list
       required: "true",
       default: "unknown"
     }
   ])
   .then(answers => {
-    console.log("Your choices:", answers);
-    // put the stuff in the database
-    let query = "INSERT INTO EMPLOYEES (first_name, last_name, role_id, manager_id) values(?)";
-    connection.query(query,[answers.firstName, answers.lastName, answers.role, answers.manager], (err, result) => {
+    let query = "SELECT id FROM ROLES WHERE title = ?";
+    connection.query(query,[answers.role_id], (err, result) => {
       if (err) throw err;
-      console.log("record inserted");
+      answers.manager_id = parseInt(answers.manager_id, 10);
+      answers.role_id = result[0].id;
+      insertIntoTable(answers, "EMPLOYEES");
     })
   })
-  .then(result => {
-    console.log("result of insertion", result);
+  .then(() => {
     return promptForAction();
   });
-}
+};
 
-addEmployee.catch = (err) => {
-  console.log("ERROR in addEmployee:", err);
+employeeQuestions.catch = (err) => {
+  console.log("ERROR in employeeQuestions:", err);
 };
 
 const addRole = () => {
+  let query =  "SELECT (name) from DEPARTMENTS";
+  let deptNames = [];
+  connection.query(query, (err, result) => {
+    if(err) throw err;
+    console.log("RESULT", result);
+    deptNames = result.map(element => element.name);
+    roleQuestions(deptNames);
+  })
+}
+
+addRole.catch = (err) => {
+  console.log("ERROR in addRole:", err);
+};
+
+const roleQuestions = (deptNames) => {
   inquirer.prompt([
     {
       type: "input",
       name: "title",
-      message: "Enter a department title",
+      message: "Enter a role name",
       required: "true",
-      default: "default-title"
+      default: "default-role"
     },
     {
       type: "input",
@@ -125,19 +132,29 @@ const addRole = () => {
       default: "0"
     },
     {
-      type: "input",
-      name: "id",
-      message: "Enter the role id number",
+      type: "list",
+      name: "department_id",  // might not matter what this is named
+      message: "Select a role name",
+      choices: deptNames,
       required: "true",
-      default: "000" // needs to be unique: can we validate here?
     }
   ])
   .then(answers => {
     console.log("Your choices:", answers);
-  });
+    let query = "SELECT id FROM DEPARTMENTS WHERE name = ?";
+    connection.query(query, [answers.department_id], (err, result) => {
+      if(err) throw err;
+      answers.salary = parseFloat(answers.salary);
+      answers.department_id = result[0].id;
+      insertIntoTable(answers, "ROLES");
+    })
+  })
+  .then(() => {
+    promptForAction();
+  })
 }
 
-addRole.catch = (err) => {
+roleQuestions.catch = (err) => {
   console.log("ERROR in addRole:", err);
 };
 
@@ -150,31 +167,28 @@ const addDepartment = () => {
     default: "nothing" // auto incremented value
   })
   .then(answer => {
-    connection.connect(err => {
-      if(err) throw err;
-      console.log("connected");
-      let query = `INSERT INTO DEPARTMENTS (name) values(?)`;
-      connection.query(query,[answer.name], (err, result) => {
-        if (err) throw err;
-        console.log("record inserted");
-      })
-    })
+    insertIntoTable(answer, "DEPARTMENTS");
   })
   .then(result => {
     console.log("result of insertion", result);
     return promptForAction();
   });
-}
+};
 
 addDepartment.catch = (err) => {
   console.log("ERROR in addDepartment:", err);
 };
 
+const insertIntoTable = ((answers, tableName) => {
+  let query = `INSERT INTO ${tableName} SET ?`;
+  connection.query(query, answers, (err, result) => {
+    if (err) throw err;
+    console.log(`record inserted into ${tableName}`);
+    console.log("results:", result);
+  })
+})
 
-// promptForAction();
-// addEmployee();
-// addRole();
-console.log(getRoles());
 
+promptForAction();
 
 // when deleting: delete cascade - it will also delete the employee
