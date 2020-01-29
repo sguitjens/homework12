@@ -23,7 +23,7 @@ const promptForAction = () => {
       name: "action",
       message: "What would you like to do?",
       choices: ["Add an employee", "Add a department", "Add a role",
-                "View all employees", "View all departments", "View all roles", "Finish"],
+                "View all employees", "View all departments", "View all roles", "Change a role for an employee", "Finish"],
       default: "Add Employee"
   })
   .then(answer => {
@@ -103,18 +103,22 @@ const employeeQuestions = (roles, managers) => {
     }
   ])
   .then(answers => {
+    // get the role id from the title
     let query = "SELECT id FROM ROLES WHERE title = ?";
-    connection.query(query,[answers.role_id], (err, result) => {
+    connection.query(query,[answers.role_id], (err, role_id_result) => {
       if (err) throw err;
-      answers.manager_id = 7; // TEMP VALUE
-      // answers.manager_id = parseInt(answers.manager_id, 10); // this needs to change
-      answers.role_id = result[0].id;
-      insertIntoTable(answers, "EMPLOYEES");
-    })
+      answers.role_id = role_id_result[0].id;
+      // repetitive: need to figure out how to pull this out
+      // get the employee's id from the name
+      query = "SELECT id FROM EMPLOYEES WHERE CONCAT(first_name, ' ', last_name) = ?";
+      connection.query(query, [answers.manager_id], (err, empl_id_result) => {
+        if(err) throw err;
+        answers.manager_id = empl_id_result[0].id; // BROKEN
+        insertIntoTable(answers, "EMPLOYEES");
+      });
+    });
   })
-  .then(() => {
-    return promptForAction();
-  });
+  .then(() => promptForAction());
 };
 
 employeeQuestions.catch = (err) => {
@@ -168,9 +172,7 @@ const roleQuestions = (deptNames) => {
       insertIntoTable(answers, "ROLES");
     })
   })
-  .then(() => {
-    promptForAction();
-  })
+  .then(() => promptForAction())
 }
 
 roleQuestions.catch = (err) => {
@@ -188,9 +190,7 @@ const addDepartment = () => {
   .then(answer => {
     insertIntoTable(answer, "DEPARTMENTS");
   })
-  .then(result => {
-    return promptForAction();
-  });
+  .then(() => promptForAction());
 };
 
 addDepartment.catch = (err) => {
@@ -235,8 +235,8 @@ const changeRoleQuestions = (employeeList, roleList) => {
     }
   ])
   .then(answers => {
-    let query = "SELECT id FROM EMPLOYEES WHERE CONCAT(first_name, ' ', last_name) = ?";
     // get the employee's id from the name
+    let query = "SELECT id FROM EMPLOYEES WHERE CONCAT(first_name, ' ', last_name) = ?";
     connection.query(query, [answers.employee_name], (err, empl_id_result) => {
       if(err) throw err;
       // get the role id from the role title
@@ -247,7 +247,7 @@ const changeRoleQuestions = (employeeList, roleList) => {
         query = "UPDATE EMPLOYEES SET role_id = ? WHERE id = ?";
         connection.query(query, [role_id_result[0].id, empl_id_result[0].id], (err, result) => {
           if(err) throw err;
-          console.log(`${result.affectedRows} row(s) affected, ${result.changedRows} changed`)
+          console.log(`       ${result.affectedRows} row(s) affected, ${result.changedRows} changed`)
           promptForAction();
         });
       });
@@ -267,8 +267,6 @@ const insertIntoTable = ((answers, tableName) => {
 })
 
 const viewTable = (tableName) => {
-  // let query = "SELECT * FROM ?";
-  // connection.query(query, tableName, (err, result) => {
   let query = `SELECT * FROM ${tableName}`;
   connection.query(query, (err, result) => {
     if (err) throw err;
@@ -282,34 +280,12 @@ viewTable.catch = err => {
   console.log("ERROR in ViewTable()", err);
 }
 
-const testUpdate = (table, data, key) => { // data is an array of objects, key value for the row to update
-  // UPDATE EMPLOYEES SET first_name = 'Deanna', last_name= 'Troy' WHERE id = 9;
-  let query = `UPDATE ${table} SET ${data}, last_name= 'Troy' WHERE id = ${key};`;
-
-  /*
-connection.query('UPDATE users SET foo = ?, bar = ?, baz = ? WHERE id = ?', ['a', 'b', 'c', userId], function (error, results, fields) {
-  if (error) throw error;
-  // ...
-});
-
-  */
-}
-
-// update employee rol: title, salary, dept_id
-// update employee manater
-
-const updateEmployeeRole = (empl_id, new_role_id) => {
-   let query = "UPDATE EMPLOYEES SET role_id = ? WHERE id = ?";
-   connection.query(query, [empl_id, new_role_id], (err, result) => {
-    if(err) throw err;
-    // console.log("result", result);
-    console.log(`${result.affectedRows} row(s) affected, ${result.changedRows} changed`)
-   })
-}
-
 const welcomeBanner = () => {
   console.log(`
 
+  *       *     *       *    *       * 
+  *             *      *    *         **  *
+      *          *      
             Employee Tracker
   *     *   *     *       *           * 
    ** *  *           *          *         *
@@ -327,9 +303,7 @@ const welcomeBanner = () => {
   `)
 }
 
-// welcomeBanner();
-// promptForAction();
-
-changeEmployeeRole();
+welcomeBanner();
+promptForAction();
 
 // when deleting: delete cascade - it will also delete the employee
