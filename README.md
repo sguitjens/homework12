@@ -65,3 +65,4 @@ Bonus functionality (may not be implemented, but don't count on it):
 
 * [console.table](https://www.npmjs.com/package/console.table) to print MySQL rows to the console. There is a built-in version of `console.table`, but the NPM package formats the data a little better for our purposes.
 
+* [dotenv](https://www.npmjs.com/package/dotenv) to load environment variables from a .env file into process.env.
