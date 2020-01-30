@@ -23,7 +23,7 @@ Basic functionality:
 
   * Update employee roles
 
-Bonus functionality (may not be implemented, but don't count on it):
+Bonus functionality (may be implemented, but don't count on it):
 
   * Update employee managers
 

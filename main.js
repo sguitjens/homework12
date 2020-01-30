@@ -23,7 +23,8 @@ const promptForAction = () => {
       name: "action",
       message: "What would you like to do?",
       choices: ["Add an employee", "Add a department", "Add a role",
-                "View all employees", "View all departments", "View all roles", "Change a role for an employee", "Finish"],
+                "View all employees", "View all departments", "View all roles",
+                "Change a role for an employee", "Change the manager for an employee", "FINISH"],
       default: "Add Employee"
   })
   .then(answer => {
@@ -37,6 +38,7 @@ const promptForAction = () => {
       case "View all departments": return viewTable("DEPARTMENTS");
       case "View all roles": return viewTable("ROLES");
       case "Change a role for an employee": return changeEmployeeRole();
+      case "Change the manager for an employee": return changeEmployeeManager();
     }
   });
 };
@@ -259,6 +261,64 @@ changeRoleQuestions.catch = (err) => {
   console.log("ERROR in changeRoleQuestions():", err);
 };
 
+const changeEmployeeManager = () => {
+    // get list of employees
+    let mgrQuery = "SELECT first_name, last_name FROM EMPLOYEES";
+    connection.query(mgrQuery, (err, result) => {
+      if(err) throw err;
+      let employeeList = result.map(element => `${element.first_name} ${element.last_name}`);
+      // // get list of roles
+      // let roleQuery = "SELECT title FROM ROLES";
+      // connection.query(roleQuery, (err, result) => {
+      //   if(err) throw err;
+      //   let roleList = result.map(element => `${element.title}`);
+        changeManagerQuestions(employeeList);
+      // });
+    });
+}
+
+const changeManagerQuestions = (employeeList) => {
+  inquirer.prompt([
+    {
+      type: "list",
+      name: "employee_name",
+      message: "Select the employee whose manager you want to change",
+      choices: employeeList,
+      required: "true",
+    },
+    {
+      type: "list",
+      name: "manager_name",
+      message: "Select the manager to assign to that employee",
+      choices: employeeList,
+      required: "true",
+    }
+  ])
+  .then(answers => {
+    // get the employee's id from the name
+    let query = "SELECT id FROM EMPLOYEES WHERE CONCAT(first_name, ' ', last_name) = ?";
+    connection.query(query, [answers.employee_name], (err, employee_result) => {
+      if(err) throw err;
+      // get the manager's id from the name
+      query = "SELECT id FROM EMPLOYEES WHERE CONCAT(first_name, ' ', last_name) = ?";
+      connection.query(query, [answers.manager_name], (err, manager_result) => { // problem here
+        if(err) throw err;
+        // update the employee's manager id to be the manager's id
+        query = "UPDATE EMPLOYEES SET manager_id = ? WHERE id = ?";
+        connection.query(query, [manager_result[0].id, employee_result[0].id], (err, result) => {
+          if(err) throw err;
+          console.log(`       ${result.affectedRows} row(s) affected, ${result.changedRows} changed`)
+          promptForAction();
+        });
+      });
+    });
+  });
+};
+
+changeManagerQuestions.catch = (err) => {
+  console.log("ERROR in changeManagerQuestions():", err);
+};
+
 const insertIntoTable = ((answers, tableName) => {
   let query = `INSERT INTO ${tableName} SET ?`;
   connection.query(query, answers, (err, result) => {
@@ -305,5 +365,6 @@ const welcomeBanner = () => {
 
 welcomeBanner();
 promptForAction();
+
 
 // when deleting: delete cascade - it will also delete the employee
