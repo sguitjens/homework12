@@ -326,8 +326,6 @@ insertIntoTable.catch = err => {
 
 
 const viewTable = (tableName) => {
-  //"SELECT * FROM Orders LEFT JOIN Customers ON Orders.CustomerID=Customers.CustomerID";
-  //"SELECT * FROM EMPLOYEES LEFT JOIN ROLES ON EMPLOYEES.role_id=ROLES.id";
   let query = `SELECT * FROM ${tableName}`;
   connection.query(query, (err, result) => {
     if (err) throw err;
