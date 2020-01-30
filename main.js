@@ -22,15 +22,15 @@ const promptForAction = () => {
       type: "list",
       name: "action",
       message: "What would you like to do?",
-      choices: ["Add an employee", "Add a department", "Add a role",
+      choices: ["FINISH", "Add an employee", "Add a department", "Add a role",
                 "View all employees", "View all departments", "View all roles",
-                "Change a role for an employee", "Change the manager for an employee", "FINISH"],
+                "Change a role for an employee", "Change the manager for an employee"],
       default: "Add Employee"
   })
   .then(answer => {
     console.log("You chose to", answer.action);
     switch(answer.action) {
-      case "Finish": return cleanUpAndEnd();
+      case "FINISH": return cleanUpAndEnd();
       case "Add an employee": return addEmployee();
       case "Add a department": return addDepartment();
       case "Add a role": return addRole();
@@ -267,13 +267,7 @@ const changeEmployeeManager = () => {
     connection.query(mgrQuery, (err, result) => {
       if(err) throw err;
       let employeeList = result.map(element => `${element.first_name} ${element.last_name}`);
-      // // get list of roles
-      // let roleQuery = "SELECT title FROM ROLES";
-      // connection.query(roleQuery, (err, result) => {
-      //   if(err) throw err;
-      //   let roleList = result.map(element => `${element.title}`);
-        changeManagerQuestions(employeeList);
-      // });
+      changeManagerQuestions(employeeList);
     });
 }
 
@@ -301,7 +295,7 @@ const changeManagerQuestions = (employeeList) => {
       if(err) throw err;
       // get the manager's id from the name
       query = "SELECT id FROM EMPLOYEES WHERE CONCAT(first_name, ' ', last_name) = ?";
-      connection.query(query, [answers.manager_name], (err, manager_result) => { // problem here
+      connection.query(query, [answers.manager_name], (err, manager_result) => {
         if(err) throw err;
         // update the employee's manager id to be the manager's id
         query = "UPDATE EMPLOYEES SET manager_id = ? WHERE id = ?";
@@ -323,10 +317,17 @@ const insertIntoTable = ((answers, tableName) => {
   let query = `INSERT INTO ${tableName} SET ?`;
   connection.query(query, answers, (err, result) => {
     if (err) throw err;
-  })
-})
+  });
+});
+
+insertIntoTable.catch = err => {
+  console.log("ERROR in insertIntoTable()");
+}
+
 
 const viewTable = (tableName) => {
+  //"SELECT * FROM Orders LEFT JOIN Customers ON Orders.CustomerID=Customers.CustomerID";
+  //"SELECT * FROM EMPLOYEES LEFT JOIN ROLES ON EMPLOYEES.role_id=ROLES.id";
   let query = `SELECT * FROM ${tableName}`;
   connection.query(query, (err, result) => {
     if (err) throw err;
